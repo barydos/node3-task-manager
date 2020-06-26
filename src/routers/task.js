@@ -27,7 +27,7 @@ router.get('/tasks', auth, async (req, res) => {
             }
         }).execPopulate()
         res.send(req.user.tasks)
-    } catch {
+    } catch (e) {
         res.status(500).send()
     }
 })
@@ -44,7 +44,7 @@ router.get('/tasks/:id', auth, async (req, res) => {
         }
 
         res.send(task)
-    } catch {
+    } catch (e) {
         res.status(500).send()
     }
 })
