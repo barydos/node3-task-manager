@@ -1,36 +1,60 @@
 const request = require('supertest')
 const app = require('../src/app')
+const mongoose = require('mongoose')
+const jwt = require('jsonwebtoken')
 const User = require('../src/models/user')
 
-const newUser = {
+const userOneId = new mongoose.Types.ObjectId()
+const userOne = {
+    _id: userOneId,
     "name": "Test",
     "age": 25,
     "email": "test@gmail.com",
-    "password": "testpass1"
+    "password": "testpass1",
+    "tokens": [{
+        token: jwt.sign({ _id: userOneId}, process.env.JWT_SECRET)
+    }]
 } 
 
 beforeEach(async () => {
     await User.deleteMany()
-    await new User(newUser).save()
+    await new User(userOne).save()
 })
 
 test('Should signup a new user', async () => {
-    await request(app).post('/users').send({
+    const response = await request(app).post('/users').send({
         "name": "Barry",
         "age": "24",
-        "email": "barry@gmail.com",
+        "email": "barryxwu@gmail.com",
         "password": "barrypass1"
     }).expect(201)
+
+    // Assert that the database was changed correctly
+    const user = await User.findById(response.body.user._id)
+    expect(user).not.toBeNull()
+
+    // Assert the response
+    expect(response.body).toMatchObject({
+        user: {
+            name: "Barry",
+            age: 24
+        },
+         token: user.tokens[0].token 
+    })
 })
 
 test('Should login existing user', async () => {
-    await request(app)
+    const response = await request(app)
         .post('/users/login')
         .send({
-            email: newUser.email,
-            password: newUser.password
+            email: userOne.email,
+            password: userOne.password
         })
         .expect(200)
+
+    // Validate new token is saved
+    const user = await User.findById( userOneId )
+    expect(user.tokens[1].token).toBe(response.body.token)
 })
 
 test('Should not login non-existent user', async () => {
@@ -41,4 +65,37 @@ test('Should not login non-existent user', async () => {
             password: "fakePassw0rd"
         })
         .expect(400)
+})
+
+test('Should get profile for authenticated user', async () => {
+    await request(app)
+        .get('/users/me')
+        .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+        .send()
+        .expect(200)
+})
+
+test('Should not get profile for unauthenticated user', async () => {
+    await request(app)
+        .get('/users/me')
+        .send()
+        .expect(401)
+})
+
+test('Should delete account for user', async () => {
+    await request(app)
+        .delete('/users/me')
+        .set('Authorization',`Bearer ${userOne.tokens[0].token}`)
+        .send()
+        .expect(200)
+    // Assert null response for user
+    const user = await User.findById(userOneId)
+    expect(user).toBeNull()
+})
+
+test('Should not delete account for unauthenticated user', async () => {
+    await request(app)
+        .delete('/users/me')
+        .send()
+        .expect(401)
 })
