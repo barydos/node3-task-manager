@@ -1,24 +1,10 @@
 const request = require('supertest')
 const app = require('../src/app')
-const mongoose = require('mongoose')
-const jwt = require('jsonwebtoken')
 const User = require('../src/models/user')
-
-const userOneId = new mongoose.Types.ObjectId()
-const userOne = {
-    _id: userOneId,
-    "name": "Test",
-    "age": 25,
-    "email": "test@gmail.com",
-    "password": "testpass1",
-    "tokens": [{
-        token: jwt.sign({ _id: userOneId}, process.env.JWT_SECRET)
-    }]
-} 
+const { userOne, userOneId, setupDatabase } = require('./fixtures/db')
 
 beforeEach(async () => {
-    await User.deleteMany()
-    await new User(userOne).save()
+    await setupDatabase()
 })
 
 test('Should signup a new user', async () => {
@@ -101,7 +87,7 @@ test('Should not delete account for unauthenticated user', async () => {
 })
 
 test('Should upload avatar image',async () => {
-    await request(app)
+    const response = await request(app)
         .post('/users/me/avatar')
         .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
         .attach('avatar', 'tests/fixtures/test-profile-pic.jpg')
